@@ -1,0 +1,26 @@
+{
+  "name": "docviewer",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Chrome MV3 extension that previews Office documents (Word, Excel, PowerPoint) in a browser tab.",
+  "scripts": {
+    "icons": "node scripts/make-icons.mjs",
+    "build": "node scripts/build.mjs",
+    "dev": "node scripts/build.mjs --watch",
+    "check": "node scripts/check-syntax.mjs",
+    "test": "node test/spreadsheet.test.mjs && node test/interception.test.mjs"
+  },
+  "devDependencies": {
+    "@aiden0z/pptx-renderer": "^1.4.0",
+    "docx-preview": "^0.4.1",
+    "esbuild": "^0.28.2",
+    "exceljs": "^4.4.0",
+    "papaparse": "^5.7.0",
+    "pptx-vanilla-viewer": "^3.43.0",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  },
+  "overrides": {
+    "uuid": "^11.1.1"
+  }
+}

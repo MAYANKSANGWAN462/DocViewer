@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DocViewer</title>
+    <link rel="stylesheet" href="viewer.css" />
+  </head>
+  <body>
+    <header class="toolbar">
+      <div class="toolbar__left">
+        <span class="brand">DocViewer</span>
+        <span id="filename" class="filename" aria-live="polite"></span>
+        <span id="type-badge" class="badge" hidden></span>
+      </div>
+      <div class="toolbar__right">
+        <div id="zoom-controls" class="zoombar" hidden role="group" aria-label="Zoom">
+          <button id="btn-zoom-out" class="btn btn--icon" type="button" title="Zoom out" aria-label="Zoom out">−</button>
+          <button id="btn-zoom-level" class="btn zoombar__level" type="button" title="Reset to fit">100%</button>
+          <button id="btn-zoom-in" class="btn btn--icon" type="button" title="Zoom in" aria-label="Zoom in">+</button>
+          <button id="btn-zoom-fit" class="btn" type="button" title="Fit to width">Fit</button>
+        </div>
+        <button id="btn-open" class="btn" type="button">Open file…</button>
+        <button id="btn-open-original" class="btn" type="button" hidden>Open original</button>
+        <button id="btn-max-fidelity" class="btn" type="button" hidden>Max-fidelity</button>
+        <button id="btn-download" class="btn btn--primary" type="button" disabled>Download</button>
+      </div>
+    </header>
+
+    <main id="stage" class="stage">
+      <section id="dropzone" class="dropzone">
+        <div class="dropzone__inner">
+          <h1>Drop a document to preview</h1>
+          <p>Word, Excel, PowerPoint or CSV — nothing leaves your browser.</p>
+          <button id="btn-pick" class="btn btn--primary" type="button">Choose a file</button>
+          <p class="hint">PDFs open in Chrome’s built-in viewer and are not handled here.</p>
+        </div>
+      </section>
+
+      <section id="content" class="content" hidden></section>
+
+      <section id="loading" class="overlay" hidden>
+        <div class="spinner" aria-hidden="true"></div>
+        <p id="loading-text">Loading…</p>
+      </section>
+
+      <section id="size-warn" class="panel" hidden>
+        <h2>Large file</h2>
+        <p id="size-warn-text"></p>
+        <div class="panel__actions">
+          <button id="btn-render-anyway" class="btn btn--primary" type="button">Render anyway</button>
+          <button id="btn-cancel-render" class="btn" type="button">Cancel</button>
+        </div>
+      </section>
+
+      <section id="error" class="panel panel--error" hidden>
+        <h2 id="error-title">Something went wrong</h2>
+        <p id="error-text"></p>
+        <div class="panel__actions">
+          <button id="btn-error-download" class="btn btn--primary" type="button" hidden>Download original</button>
+          <button id="btn-error-open" class="btn" type="button" hidden>Open original URL</button>
+        </div>
+      </section>
+    </main>
+
+    <input id="file-input" type="file" hidden accept=".csv,.xlsx,.xls,.docx,.doc,.pptx,.ppt" />
+
+    <script type="module" src="viewer.js"></script>
+  </body>
+</html>

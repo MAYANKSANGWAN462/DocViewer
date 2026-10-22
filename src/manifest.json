@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "DocViewer — In-Tab Office Viewer",
+  "version": "0.0.1",
+  "description": "Preview Word, Excel and PowerPoint files directly in a Chrome tab — no download, no account, no upload.",
+  "minimum_chrome_version": "116",
+  "permissions": ["storage", "declarativeNetRequestWithHostAccess", "downloads"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "service-worker.js",
+    "type": "module"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_title": "DocViewer",
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["viewer/viewer.html"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https: blob: data:; object-src 'none'; frame-src 'self' blob:"
+  }
+}

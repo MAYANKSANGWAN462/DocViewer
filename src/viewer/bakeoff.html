@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DocViewer — PPTX Renderer Bake-off</title>
+    <link rel="stylesheet" href="viewer.css" />
+  </head>
+  <body>
+    <header class="toolbar">
+      <div class="toolbar__left">
+        <span class="brand">DocViewer</span>
+        <span class="filename">PowerPoint renderer bake-off</span>
+      </div>
+      <div class="toolbar__right">
+        <button id="btn-pick" class="btn btn--primary" type="button">Choose a .pptx…</button>
+      </div>
+    </header>
+
+    <main class="bakeoff">
+      <section class="bakeoff__pane">
+        <h2 class="bakeoff__title">aiden0z/pptx-renderer</h2>
+        <iframe id="frame-aiden" class="bakeoff__frame" title="aiden0z renderer"></iframe>
+      </section>
+      <section class="bakeoff__pane">
+        <h2 class="bakeoff__title">pptx-vanilla-viewer (Ordalie)</h2>
+        <iframe id="frame-ordalie" class="bakeoff__frame" title="ordalie renderer"></iframe>
+      </section>
+    </main>
+
+    <input id="file-input" type="file" hidden accept=".pptx" />
+    <script type="module" src="bakeoff.js"></script>
+  </body>
+</html>
