@@ -79,9 +79,17 @@ export const SETTINGS_KEY = 'docviewer.settings';
 export const DEFAULT_SETTINGS = {
   interceptionEnabled: true,
   disabledSites: [], // hostnames where auto-preview is turned off
-  pptxRenderer: 'aiden0z', // 'aiden0z' | 'ordalie' — active PowerPoint renderer
-  maxFidelity: { enabled: false }, // optional self-hosted LibreOffice-WASM engine (experimental)
+  // 'ordalie' (high-fidelity, default — faithful shapes/SmartArt/WordArt/charts/icons, renders the
+  // whole deck once) | 'aiden0z' (fast/lean, optional — windowed streaming for very large decks).
+  pptxRenderer: 'ordalie',
 };
+
+/**
+ * Above this .pptx size the dispatcher auto-falls back from the heavy Ordalie engine to the fast
+ * windowed aiden0z engine, so a huge deck can't pin the tab while Ordalie renders every slide at
+ * once. An explicit popup choice or ?renderer= override is always honored (no fallback).
+ */
+export const PPTX_FAST_FALLBACK_BYTES = 25 * 1024 * 1024; // 25 MB
 
 /** Extensions the interceptor currently redirects to the viewer. PPTX joins in Phase 4; legacy
  *  .doc/.ppt wait for the Phase 5 WASM path. */

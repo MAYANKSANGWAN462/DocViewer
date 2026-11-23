@@ -8,6 +8,7 @@
   <body class="popup">
     <h1 class="popup__title">DocViewer</h1>
     <p class="popup__status">Office downloads open in a preview tab.</p>
+    <p class="popup__saved" id="popup-saved" role="status" aria-live="polite">Saved ✓</p>
 
     <label class="popup__row">
       <input type="checkbox" id="toggle-interception" />
@@ -19,21 +20,16 @@
       <span>Don’t preview on <strong id="site-host"></strong></span>
     </label>
 
-    <label class="popup__row popup__row--select">
-      <span>PowerPoint renderer</span>
-      <select id="pptx-renderer">
-        <option value="aiden0z">aiden0z (lean)</option>
-        <option value="ordalie">Ordalie (feature-rich)</option>
+    <label class="popup__row popup__row--select" title="Choose how PowerPoint files are rendered">
+      <span>PowerPoint quality</span>
+      <select id="pptx-renderer" aria-label="PowerPoint rendering quality">
+        <option value="ordalie">High quality (recommended — full shapes &amp; effects)</option>
+        <option value="aiden0z">Fast (quicker to open; used automatically for very large decks)</option>
       </select>
     </label>
 
-    <label class="popup__row">
-      <input type="checkbox" id="toggle-maxfidelity" />
-      <span>Max-fidelity mode <em>(experimental; needs engine)</em></span>
-    </label>
-
-    <button id="btn-bakeoff" class="btn" type="button">Compare renderers…</button>
-    <button id="btn-open-viewer" class="btn btn--primary" type="button">Open viewer</button>
+    <button id="btn-bakeoff" class="btn" type="button" title="Open the same PowerPoint side by side in both renderers to compare quality" aria-label="Compare PowerPoint renderers side by side">Compare PowerPoint quality…</button>
+    <button id="btn-open-viewer" class="btn btn--primary" type="button" title="Open the document viewer in a new tab" aria-label="Open the document viewer">Open viewer</button>
 
     <script type="module" src="popup.js"></script>
   </body>

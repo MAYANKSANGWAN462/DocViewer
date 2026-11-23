@@ -154,8 +154,13 @@ function buildVirtualTable(sheet, colCount, rowCount) {
   const top = makeSpacer();
   const bottom = makeSpacer();
 
+  // Dedupe on the FULL window (row range *and* both spacer heights). Keying only on start/end let a
+  // changed viewport height slip through with the same rows but stale padding — and, worse, allowed
+  // the initial paint and its post-layout correction to each rebuild the body, thrashing layout.
   let lastStart = -1;
   let lastEnd = -1;
+  let lastTopPad = -1;
+  let lastBottomPad = -1;
   const paint = () => {
     const { start, end, topPad, bottomPad } = computeWindow(
       scroller.scrollTop,
@@ -163,9 +168,11 @@ function buildVirtualTable(sheet, colCount, rowCount) {
       VIRTUAL_ROW_PX,
       rowCount,
     );
-    if (start === lastStart && end === lastEnd) return;
+    if (start === lastStart && end === lastEnd && topPad === lastTopPad && bottomPad === lastBottomPad) return;
     lastStart = start;
     lastEnd = end;
+    lastTopPad = topPad;
+    lastBottomPad = bottomPad;
     top.td.style.height = `${topPad}px`;
     bottom.td.style.height = `${bottomPad}px`;
     tbody.replaceChildren(top.tr);
@@ -182,7 +189,9 @@ function buildVirtualTable(sheet, colCount, rowCount) {
       paint();
     });
   });
-  // clientHeight needs layout; paint now and again on the next frame once sized.
+  // Paint once now so there's content immediately, then re-measure on the next frame: clientHeight is
+  // 0 until the scroller is in layout, so the first pass uses the 600px fallback. If the real height
+  // yields the same window the rAF pass is a no-op (guard above); otherwise it corrects it exactly once.
   paint();
   requestAnimationFrame(paint);
   return scroller;
@@ -204,7 +213,7 @@ function buildSheetTable(sheet) {
   return frag;
 }
 
-export async function renderSpreadsheet(mount, { parsed }) {
+export async function renderSpreadsheet(mount, { parsed, onFirstPaint }) {
   if (!parsed || parsed.kind !== 'spreadsheet' || !Array.isArray(parsed.sheets) || !parsed.sheets.length) {
     throw new Error('Could not read the spreadsheet contents.');
   }
@@ -240,5 +249,11 @@ export async function renderSpreadsheet(mount, { parsed }) {
     root.append(tabs);
   }
 
-  renderSheet();
+  // Build the grid in a try/finally so the overlay clears the instant any rows are on screen, even
+  // if styling a later cell throws mid-build. The orchestrator's finally is the backstop.
+  try {
+    renderSheet();
+  } finally {
+    if (sheetHost.childElementCount > 0) onFirstPaint?.();
+  }
 }

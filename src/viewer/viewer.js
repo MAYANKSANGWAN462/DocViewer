@@ -8,8 +8,6 @@
 import { sniffType } from './typeSniff.js';
 import { getRenderer } from './renderers/router.js';
 import { FORMATS, MIME_TO_FORMAT, SIZE_WARN_BYTES, SIZE_HARD_CAP_BYTES } from '../common/constants.js';
-import { readSettings } from '../common/settings.js';
-import { openInMaxFidelity } from './renderers/wasm-office.js';
 
 const $ = (id) => document.getElementById(id);
 const el = {
@@ -18,7 +16,6 @@ const el = {
   btnOpen: $('btn-open'),
   btnPick: $('btn-pick'),
   btnOpenOriginal: $('btn-open-original'),
-  btnMaxFidelity: $('btn-max-fidelity'),
   btnDownload: $('btn-download'),
   zoomControls: $('zoom-controls'),
   btnZoomOut: $('btn-zoom-out'),
@@ -31,6 +28,7 @@ const el = {
   content: $('content'),
   loading: $('loading'),
   loadingText: $('loading-text'),
+  btnLoadingDownload: $('btn-loading-download'),
   sizeWarn: $('size-warn'),
   sizeWarnText: $('size-warn-text'),
   btnRenderAnyway: $('btn-render-anyway'),
@@ -51,7 +49,14 @@ const state = { blob: null, filename: '', format: 'unknown', srcUrl: null, viewe
 // Formats parsed off-thread in the worker. DOM-building renderers (docx) run on the main thread.
 const WORKER_PARSED = new Set(['xlsx', 'xls', 'csv']);
 
+// Bounded waits so a broken or silently-dead worker can never hang the UI forever. A module
+// worker that throws while importing a bundled dependency does not reliably fire `onerror` in an
+// extension context, so we also wait on an explicit readiness ping the worker posts once booted.
+const WORKER_START_TIMEOUT_MS = 10_000; // worker must announce { ready:true } within this
+const WORKER_PARSE_TIMEOUT_MS = 120_000; // hard backstop for an alive-but-stuck parse
+
 let worker = null;
+let workerReady = null; // Promise that resolves once the worker posts { ready:true }
 let workerSeq = 0;
 const pending = new Map();
 
@@ -59,26 +64,81 @@ function getWorker() {
   if (worker) return worker;
   // Reference the built worker by its extension path (avoids esbuild rewriting new URL()).
   worker = new Worker(chrome.runtime.getURL('viewer/workers/parse.worker.js'), { type: 'module' });
-  worker.onmessage = (e) => {
-    const { id, ok, result, error } = e.data || {};
-    const resolver = pending.get(id);
-    if (!resolver) return;
-    pending.delete(id);
-    if (ok) resolver.resolve(result);
-    else resolver.reject(new Error(error));
-  };
-  worker.onerror = (e) => {
-    for (const { reject } of pending.values()) reject(new Error(e.message || 'parse worker error'));
+
+  let markReady;
+  let markFailed;
+  workerReady = new Promise((resolve, reject) => {
+    markReady = resolve;
+    markFailed = reject;
+  });
+  workerReady.catch(() => {}); // swallow "unhandled rejection" if no parse is waiting yet
+  const startTimer = setTimeout(
+    () => markFailed(new Error('The document parser did not start in time.')),
+    WORKER_START_TIMEOUT_MS,
+  );
+
+  // Tear down a dead worker and reject everything waiting on it; the next parse rebuilds it fresh.
+  const killWorker = (message) => {
+    clearTimeout(startTimer);
+    markFailed(new Error(message)); // no-op if the ready promise already settled
+    for (const { reject } of pending.values()) reject(new Error(message));
     pending.clear();
+    try {
+      worker?.terminate();
+    } catch {
+      /* best effort */
+    }
+    worker = null;
+    workerReady = null;
   };
+
+  worker.onmessage = (e) => {
+    const data = e.data || {};
+    if (data.ready) {
+      clearTimeout(startTimer);
+      markReady();
+      return;
+    }
+    const resolver = pending.get(data.id);
+    if (!resolver) return;
+    pending.delete(data.id);
+    if (data.ok) resolver.resolve(data.result);
+    else resolver.reject(new Error(data.error));
+  };
+  worker.onerror = (e) => killWorker(e.message || 'The document parser crashed.');
+  worker.onmessageerror = () => killWorker('The document parser sent an unreadable message.');
   return worker;
 }
 
 function parseInWorker(blob, format) {
+  const w = getWorker();
+  const ready = workerReady;
   const id = ++workerSeq;
   return new Promise((resolve, reject) => {
-    pending.set(id, { resolve, reject });
-    getWorker().postMessage({ id, blob, format });
+    let settled = false;
+    const finish = (fn, arg) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      pending.delete(id);
+      fn(arg);
+    };
+    const timer = setTimeout(
+      () => finish(reject, new Error('Parsing timed out — the file may be extremely large or corrupt.')),
+      WORKER_PARSE_TIMEOUT_MS,
+    );
+    pending.set(id, { resolve: (r) => finish(resolve, r), reject: (err) => finish(reject, err) });
+    // Post only once the worker has booted; if it never boots, `ready` rejects and so do we.
+    ready.then(
+      () => {
+        try {
+          w.postMessage({ id, blob, format });
+        } catch (err) {
+          finish(reject, err instanceof Error ? err : new Error(String(err)));
+        }
+      },
+      (err) => finish(reject, err),
+    );
   });
 }
 
@@ -118,6 +178,13 @@ function showError(title, message, { allowDownload = true, allowOpen = false } =
   el.btnErrorDownload.hidden = !(allowDownload && state.blob);
   el.btnErrorOpen.hidden = !(allowOpen && state.srcUrl);
   el.error.hidden = false;
+}
+
+/** Disable actions that start or replace a render while one is in flight (prevents re-entrancy and
+ *  mid-render churn). Download stays enabled on purpose — it's the escape hatch for a slow render. */
+function setToolbarBusy(busy) {
+  el.btnOpen.disabled = busy;
+  el.btnPick.disabled = busy;
 }
 
 // --------------------------------------------------------------------------
@@ -223,8 +290,6 @@ function confirmLargeFile(size) {
   });
 }
 
-const MAX_FIDELITY_FORMATS = new Set(['pptx', 'docx', 'doc', 'ppt']);
-
 /** Remove active-content vectors from renderer output (defense-in-depth; CSP already blocks JS). */
 function scrubDangerous(root) {
   root.querySelectorAll('script, object, embed').forEach((n) => n.remove());
@@ -245,18 +310,13 @@ function scrubDangerous(root) {
   }
 }
 
-/** Reveal the Max-fidelity button only for formats where it helps, and only when enabled. */
-async function maybeShowMaxFidelity(format) {
-  if (!MAX_FIDELITY_FORMATS.has(format)) {
-    el.btnMaxFidelity.hidden = true;
-    return;
-  }
-  try {
-    el.btnMaxFidelity.hidden = !(await readSettings()).maxFidelity?.enabled;
-  } catch {
-    el.btnMaxFidelity.hidden = true;
-  }
-}
+// After this long with nothing painted, stop implying "almost done": keep rendering but tell the
+// user and surface a Download escape hatch, so the spinner can never read as a silent dead-end.
+const SLOW_RENDER_MS = 12_000;
+// Hard cap: if NOTHING has painted by now, give up and show an actionable error instead of an
+// endless spinner. The fast engine paints in a second or two, so this only trips on a stuck render.
+const RENDER_HARD_TIMEOUT_MS = 30_000;
+let renderToken = 0; // bumped per render so a superseded one can't clobber a newer file's UI
 
 async function renderActive(sniff) {
   // Render into a VISIBLE content stage with the spinner overlaid on top (the overlay is
@@ -264,38 +324,83 @@ async function renderActive(sniff) {
   // the virtualized grid — must measure a real clientWidth; a hidden (display:none) container
   // measures 0, which makes slides render at the wrong size and triggers re-layout churn once
   // the container is finally shown.
+  const token = ++renderToken;
   teardownViewer();
   hideAll();
   el.content.replaceChildren();
   el.content.hidden = false;
   el.loadingText.textContent = `Rendering ${FORMATS[sniff.format]?.label || 'document'}…`;
+  el.btnLoadingDownload.hidden = true;
   el.loading.hidden = false;
+  setToolbarBusy(true);
 
-  let parsed = null;
-  if (WORKER_PARSED.has(sniff.format)) {
-    try {
-      parsed = await parseInWorker(state.blob, sniff.format);
-    } catch (err) {
-      console.warn('[DocViewer] parse worker failed (continuing to renderer):', err);
-    }
-  }
-  const render = getRenderer(sniff.format);
+  let painted = false;
+  const onFirstPaint = () => {
+    if (token !== renderToken) return; // a newer render owns the overlay now
+    painted = true;
+    el.loading.hidden = true; // drop the overlay the moment content appears
+  };
+  const slowTimer = setTimeout(() => {
+    if (painted || token !== renderToken) return;
+    el.loadingText.textContent = 'Still working — large files can take a while. You can download it instead.';
+    el.btnLoadingDownload.hidden = !state.blob;
+  }, SLOW_RENDER_MS);
+
+  // One try/catch/finally around the WHOLE parse+render sequence: the parse await used to sit
+  // outside it, so a worker that never answered left the overlay up forever. Now every exit —
+  // success, error, or timeout — flows through `finally` and clears the overlay.
   let controller = null;
+  let hardTimer = null;
   try {
-    controller = await render(el.content, {
+    let parsed = null;
+    if (WORKER_PARSED.has(sniff.format)) {
+      parsed = await parseInWorker(state.blob, sniff.format);
+    }
+    if (token !== renderToken) return; // a newer file superseded this one while parsing
+    const render = getRenderer(sniff.format);
+    const rendered = render(el.content, {
       blob: state.blob,
       filename: state.filename,
       sniff,
       parsed,
       scrollContainer: el.stage, // the real scroll ancestor; used by the PPTX windowed renderer
-      onFirstPaint: () => (el.loading.hidden = true), // drop the overlay the moment content appears
+      onFirstPaint,
     });
+    // Race the render against a hard cap: if nothing paints, fail loudly instead of forever.
+    controller = await Promise.race([
+      rendered,
+      new Promise((_resolve, reject) => {
+        hardTimer = setTimeout(() => {
+          if (!painted) {
+            reject(
+              new Error(
+                'Rendering is taking too long. Download the file, or switch PowerPoint quality to “Fast” in the DocViewer popup.',
+              ),
+            );
+          }
+        }, RENDER_HARD_TIMEOUT_MS);
+      }),
+    ]);
+    if (token !== renderToken) return;
+  } catch (err) {
+    if (token !== renderToken) return;
+    console.error('[DocViewer] render failed', err);
+    showError('Could not display this file', String(err?.message || err), {
+      allowDownload: true,
+      allowOpen: Boolean(state.srcUrl),
+    });
+    return;
   } finally {
-    el.loading.hidden = true; // content is already visible — just drop the overlay
+    if (token === renderToken) {
+      clearTimeout(slowTimer);
+      clearTimeout(hardTimer);
+      el.btnLoadingDownload.hidden = true;
+      el.loading.hidden = true;
+      setToolbarBusy(false);
+    }
   }
   scrubDangerous(el.content);
   setupViewerControls(controller);
-  await maybeShowMaxFidelity(sniff.format);
 }
 
 /** Wire the zoom/fit toolbar to a renderer that supports it (the PPTX viewer). No-op otherwise. */
@@ -318,8 +423,14 @@ function setupViewerControls(controller) {
   };
   const fitToWidth = async () => {
     try {
-      if (typeof controller.setFitMode === 'function') await controller.setFitMode('contain');
-      await controller.setZoom(100);
+      if (typeof controller.fitToWidth === 'function') {
+        // The renderer owns its fit math (e.g. Ordalie's absolute zoomToFit).
+        await controller.fitToWidth();
+      } else {
+        // aiden0z: effective scale = fitScale * zoomPercent/100, so contain-mode at 100% fits.
+        if (typeof controller.setFitMode === 'function') await controller.setFitMode('contain');
+        await controller.setZoom(100);
+      }
     } catch {
       /* ignore */
     }
@@ -404,9 +515,7 @@ el.fileInput.addEventListener('change', () => {
 });
 el.btnDownload.addEventListener('click', triggerDownload);
 el.btnErrorDownload.addEventListener('click', triggerDownload);
-el.btnMaxFidelity.addEventListener('click', () => {
-  if (state.blob) openInMaxFidelity(el.content, state.blob, state.format);
-});
+el.btnLoadingDownload.addEventListener('click', triggerDownload);
 el.btnOpenOriginal.addEventListener('click', () => state.srcUrl && window.open(state.srcUrl, '_blank', 'noopener'));
 el.btnErrorOpen.addEventListener('click', () => state.srcUrl && window.open(state.srcUrl, '_blank', 'noopener'));
 

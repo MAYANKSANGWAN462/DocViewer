@@ -31,12 +31,14 @@ export async function render(mount, blob, { scrollContainer, onFirstPaint } = {}
     lazyMedia: true, // decode embedded images on demand → faster first paint
     lazySlides: true, // parse each slide's shapes on demand → faster first paint
     pdfjs: false, // skip the optional EMF-embedded-PDF fallback (its blob worker + extra asset)
-    onSlideRendered: (index) => {
-      if (index === 0) {
-        painted = true;
-        onFirstPaint?.();
-        signalFirstPaint();
-      }
+    // Clear the overlay on the FIRST slide that paints, whatever its index. Keying this to index 0
+    // left the overlay stuck whenever windowing painted another slide first — the deck was on
+    // screen behind a spinner that never cleared. Any painted slide means we have content to show.
+    onSlideRendered: () => {
+      if (painted) return;
+      painted = true;
+      onFirstPaint?.();
+      signalFirstPaint();
     },
   });
 
@@ -45,22 +47,32 @@ export async function render(mount, blob, { scrollContainer, onFirstPaint } = {}
     renderMode: 'list', // one vertically scrollable list of all slides
     listOptions: {
       windowed: true, // keep off-screen slides out of the DOM (perf on large decks)
-      initialSlides: 3, // paint the first few immediately, then stream the rest
+      initialSlides: 1, // paint the very first slide immediately, then stream the rest → fastest first paint
       batchSize: 4,
       showSlideLabels: true, // caption each slide "Slide N"
     },
   });
 
   // Resolve on first paint; if rendering fails *before* anything painted, surface the error.
-  await Promise.race([
-    firstPaint,
-    done.then(
-      () => undefined,
-      (err) => {
-        if (!painted) throw err;
-      },
-    ),
-  ]);
+  try {
+    await Promise.race([
+      firstPaint,
+      done.then(
+        () => undefined,
+        (err) => {
+          if (!painted) throw err;
+        },
+      ),
+    ]);
+  } finally {
+    // Backstop: if slides reached the DOM but onSlideRendered never fired (library quirk), still
+    // clear the overlay rather than strand it over visible content. A failure before any paint
+    // leaves mount empty, so this is a no-op and the error still propagates to the orchestrator.
+    if (!painted && mount.childElementCount > 0) {
+      painted = true;
+      onFirstPaint?.();
+    }
+  }
 
   return viewer;
 }

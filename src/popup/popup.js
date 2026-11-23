@@ -10,9 +10,18 @@ const siteHost = document.getElementById('site-host');
 const openBtn = document.getElementById('btn-open-viewer');
 const rendererSelect = document.getElementById('pptx-renderer');
 const bakeoffBtn = document.getElementById('btn-bakeoff');
-const maxFidelityToggle = document.getElementById('toggle-maxfidelity');
+const savedNote = document.getElementById('popup-saved');
 
 let currentHost = '';
+
+let savedTimer;
+/** Briefly confirm a settings write so the change doesn't feel silent. */
+function showSaved() {
+  if (!savedNote) return;
+  savedNote.classList.add('is-visible');
+  clearTimeout(savedTimer);
+  savedTimer = setTimeout(() => savedNote.classList.remove('is-visible'), 1500);
+}
 
 async function activeHost() {
   try {
@@ -27,8 +36,7 @@ async function activeHost() {
 async function init() {
   const settings = await readSettings();
   globalToggle.checked = Boolean(settings.interceptionEnabled);
-  rendererSelect.value = settings.pptxRenderer || 'aiden0z';
-  maxFidelityToggle.checked = Boolean(settings.maxFidelity?.enabled);
+  rendererSelect.value = settings.pptxRenderer || 'ordalie';
 
   currentHost = await activeHost();
   if (currentHost) {
@@ -39,7 +47,7 @@ async function init() {
 }
 
 globalToggle.addEventListener('change', () => {
-  writeSettings({ interceptionEnabled: globalToggle.checked });
+  writeSettings({ interceptionEnabled: globalToggle.checked }).then(showSaved);
 });
 
 siteToggle.addEventListener('change', async () => {
@@ -48,6 +56,7 @@ siteToggle.addEventListener('change', async () => {
   if (siteToggle.checked) set.add(currentHost);
   else set.delete(currentHost);
   await writeSettings({ disabledSites: [...set] });
+  showSaved();
 });
 
 openBtn.addEventListener('click', () => {
@@ -55,11 +64,7 @@ openBtn.addEventListener('click', () => {
 });
 
 rendererSelect.addEventListener('change', () => {
-  writeSettings({ pptxRenderer: rendererSelect.value });
-});
-
-maxFidelityToggle.addEventListener('change', () => {
-  writeSettings({ maxFidelity: { enabled: maxFidelityToggle.checked } });
+  writeSettings({ pptxRenderer: rendererSelect.value }).then(showSaved);
 });
 
 bakeoffBtn.addEventListener('click', () => {

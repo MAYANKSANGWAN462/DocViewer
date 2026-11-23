@@ -43,3 +43,8 @@ self.onmessage = async (e) => {
     self.postMessage({ id, ok: false, error: String(err?.message || err) });
   }
 };
+
+// Announce a successful boot. If a bundled dependency had thrown while importing above, this line
+// would never run — and the viewer's readiness timeout surfaces a clear error instead of spinning
+// forever waiting on a worker that will never answer.
+self.postMessage({ ready: true });

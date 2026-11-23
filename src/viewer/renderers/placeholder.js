@@ -16,7 +16,7 @@ function formatBytes(n) {
   return `${v.toFixed(1)} ${units[i]}`;
 }
 
-export async function renderPlaceholder(mount, { blob, filename, sniff }) {
+export async function renderPlaceholder(mount, { blob, filename, sniff, onFirstPaint }) {
   const meta = FORMATS[sniff.format];
 
   const card = document.createElement('div');
@@ -54,4 +54,5 @@ export async function renderPlaceholder(mount, { blob, filename, sniff }) {
   card.append(msg);
 
   mount.append(card);
+  onFirstPaint?.(); // metadata card is up — drop the loading overlay
 }

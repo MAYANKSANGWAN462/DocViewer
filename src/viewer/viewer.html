@@ -20,10 +20,9 @@
           <button id="btn-zoom-in" class="btn btn--icon" type="button" title="Zoom in" aria-label="Zoom in">+</button>
           <button id="btn-zoom-fit" class="btn" type="button" title="Fit to width">Fit</button>
         </div>
-        <button id="btn-open" class="btn" type="button">Open file…</button>
-        <button id="btn-open-original" class="btn" type="button" hidden>Open original</button>
-        <button id="btn-max-fidelity" class="btn" type="button" hidden>Max-fidelity</button>
-        <button id="btn-download" class="btn btn--primary" type="button" disabled>Download</button>
+        <button id="btn-open" class="btn" type="button" title="Open a document from your computer" aria-label="Open a document from your computer">Open file…</button>
+        <button id="btn-open-original" class="btn" type="button" title="Open the original document in a new tab" aria-label="Open the original document in a new tab" hidden>Open original</button>
+        <button id="btn-download" class="btn btn--primary" type="button" title="Save this file to your computer" aria-label="Download this file" disabled>Download</button>
       </div>
     </header>
 
@@ -32,7 +31,7 @@
         <div class="dropzone__inner">
           <h1>Drop a document to preview</h1>
           <p>Word, Excel, PowerPoint or CSV — nothing leaves your browser.</p>
-          <button id="btn-pick" class="btn btn--primary" type="button">Choose a file</button>
+          <button id="btn-pick" class="btn btn--primary" type="button" title="Browse for a document to preview" aria-label="Choose a file to preview">Choose a file</button>
           <p class="hint">PDFs open in Chrome’s built-in viewer and are not handled here.</p>
         </div>
       </section>
@@ -42,6 +41,16 @@
       <section id="loading" class="overlay" hidden>
         <div class="spinner" aria-hidden="true"></div>
         <p id="loading-text">Loading…</p>
+        <button
+          id="btn-loading-download"
+          class="btn btn--primary"
+          type="button"
+          title="Save the original file to your computer"
+          aria-label="Download the original file"
+          hidden
+        >
+          Download instead
+        </button>
       </section>
 
       <section id="size-warn" class="panel" hidden>
@@ -57,8 +66,8 @@
         <h2 id="error-title">Something went wrong</h2>
         <p id="error-text"></p>
         <div class="panel__actions">
-          <button id="btn-error-download" class="btn btn--primary" type="button" hidden>Download original</button>
-          <button id="btn-error-open" class="btn" type="button" hidden>Open original URL</button>
+          <button id="btn-error-download" class="btn btn--primary" type="button" title="Save the original file to your computer" aria-label="Download the original file" hidden>Download original</button>
+          <button id="btn-error-open" class="btn" type="button" title="Open the original document URL in a new tab" aria-label="Open the original URL in a new tab" hidden>Open original URL</button>
         </div>
       </section>
     </main>

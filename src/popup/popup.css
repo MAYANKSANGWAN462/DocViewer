@@ -35,6 +35,17 @@ body.popup {
 }
 .btn--primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 .btn--primary:hover { background: #1d4ed8; }
+.btn:active { transform: translateY(1px); }
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.popup__saved {
+  margin: -6px 0 10px;
+  min-height: 14px;
+  color: #047857;
+  font-size: 12px;
+  font-weight: 600;
+  visibility: hidden;
+}
+.popup__saved.is-visible { visibility: visible; }
 .popup__row--select { justify-content: space-between; align-items: center; }
 .popup__row--select select { font: inherit; font-size: 13px; }
 #btn-bakeoff { margin-bottom: 8px; }
