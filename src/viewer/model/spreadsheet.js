@@ -69,6 +69,21 @@ function dateToSerial(d) {
   return d.getTime() / 86400000 + 25569;
 }
 
+/**
+ * Deterministic text for a date that carries no explicit number format (e.g. a formula that
+ * returns a date). ExcelJS stores the authored wall-clock date in the Date's UTC fields, so read
+ * them as UTC — never via toLocaleString(), whose output drifts with the host locale/timezone and
+ * would make the same cell render differently on different machines. Drops the time at midnight.
+ */
+function isoDateTime(d) {
+  const pad = (n) => String(n).padStart(2, '0');
+  const date = `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+  const h = d.getUTCHours();
+  const m = d.getUTCMinutes();
+  const s = d.getUTCSeconds();
+  return h === 0 && m === 0 && s === 0 ? date : `${date} ${pad(h)}:${pad(m)}:${pad(s)}`;
+}
+
 function extractExcelJsStyle(cell) {
   const style = {};
   const f = cell.font;
@@ -107,37 +122,48 @@ function extractExcelJsStyle(cell) {
 
 /** Display text for an ExcelJS cell, applying number formats via the injected SSF formatter. */
 function excelJsCellText(cell, ssfFormat) {
-  const v = cell.value;
+  return scalarToText(cell.value, cell.numFmt, ssfFormat);
+}
+
+/**
+ * One value → display text, honoring the cell's number format. Recursive so a FORMULA whose
+ * `result` is a number/date/error formats exactly like a literal of the same kind — previously a
+ * formula result ran through a number-only path, so a formula returning a date showed the raw
+ * Date.toString() and ignored the cell's `yyyy-mm-dd` (etc.) format.
+ */
+function scalarToText(v, numFmt, ssfFormat) {
   if (v == null) return '';
-  const fmt = (num) => {
-    if (typeof num === 'number' && cell.numFmt && ssfFormat) {
+  // Excel renders booleans uppercase (TRUE/FALSE), not JS's "true"/"false".
+  if (typeof v === 'boolean') return v ? 'TRUE' : 'FALSE';
+  if (typeof v === 'number') {
+    if (numFmt && ssfFormat) {
       try {
-        return ssfFormat(cell.numFmt, num);
+        return ssfFormat(numFmt, v);
       } catch {
-        /* fall through */
+        /* fall through to the plain number */
       }
     }
-    return num == null ? '' : String(num);
-  };
+    return String(v);
+  }
   if (v instanceof Date) {
-    if (cell.numFmt && ssfFormat) {
+    if (numFmt && ssfFormat) {
       try {
-        return ssfFormat(cell.numFmt, dateToSerial(v));
+        return ssfFormat(numFmt, dateToSerial(v));
       } catch {
-        /* fall through */
+        /* fall through to the ISO fallback */
       }
     }
-    return v.toLocaleString();
+    return isoDateTime(v);
   }
   if (typeof v === 'object') {
     if (Array.isArray(v.richText)) return v.richText.map((t) => t.text).join('');
-    if ('result' in v) return fmt(v.result);
+    if ('result' in v) return scalarToText(v.result, numFmt, ssfFormat); // formula → format its result
     if ('error' in v) return String(v.error);
     if ('text' in v) return String(v.text);
     if ('hyperlink' in v) return String(v.text ?? v.hyperlink);
     return String(v);
   }
-  return fmt(v);
+  return String(v);
 }
 
 function mergeRangesFromExcelJs(ws) {

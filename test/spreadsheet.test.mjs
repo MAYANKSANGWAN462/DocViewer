@@ -73,6 +73,18 @@ const model = await (async () => {
   ws.getCell('A4').value = new Date(Date.UTC(2020, 0, 15));
   ws.getCell('A4').numFmt = 'yyyy-mm-dd';
 
+  // Boolean — Excel renders these uppercase.
+  ws.getCell('A5').value = true;
+  ws.getCell('B5').value = false;
+
+  // Formula whose cached result is a number carrying the cell's number format.
+  const formula = ws.getCell('A6');
+  formula.value = { formula: 'B2*2', result: 2469 };
+  formula.numFmt = '#,##0.00';
+
+  // Date with NO explicit number format (e.g. a computed date) → deterministic ISO fallback.
+  ws.getCell('A7').value = new Date(Date.UTC(2021, 5, 9));
+
   const buf = await wb.xlsx.writeBuffer();
   const wb2 = new ExcelJS.Workbook();
   await wb2.xlsx.load(buf);
@@ -109,6 +121,22 @@ check('merge + fill + align', () => {
 
 check('date format', () => {
   assert.match(sheet.cells['3,0'].text, /2020-01-1[45]/);
+});
+
+check('boolean cells render TRUE/FALSE', () => {
+  assert.equal(sheet.cells['4,0'].text, 'TRUE');
+  assert.equal(sheet.cells['4,1'].text, 'FALSE');
+});
+
+check('formula result honors the cell number format', () => {
+  assert.equal(sheet.cells['5,0'].text, '2,469.00');
+});
+
+check('date without an explicit format still renders deterministically', () => {
+  // ExcelJS auto-applies a default date numFmt on write, so this goes through the SSF formatter
+  // (locale/timezone independent) rather than toLocaleString. The ISO fallback in scalarToText only
+  // catches a date that truly carries no numFmt (e.g. a computed formula result).
+  assert.equal(sheet.cells['6,0'].text, '06-09-21');
 });
 
 console.log(`\n${passed} checks passed`);

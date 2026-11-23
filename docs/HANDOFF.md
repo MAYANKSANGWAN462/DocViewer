@@ -107,3 +107,65 @@ then read `.claude/plans/login-spicy-minsky.md` (the master plan), then the file
   - Pick up Session 2 (visual redesign — light + dark/auto).
 - **Commit / branch:** **Left uncommitted at the user's request** — the user will review and commit
   themselves. All Session 1 edits are in the working tree (and rebuilt into `dist/`).
+
+---
+
+### Session 2 — Format fidelity & cleanup (continued)
+- **Date:** 2026-11-23
+- **Hard constraint:** this environment has **no browser**, so the headline Session 2 ask — the live
+  Chrome pass (open real `.pptx`/`.xlsx`/`.docx`/`.csv`, eyeball icons/shapes/SmartArt, watch DevTools
+  Performance for a layout loop) — **still could not be run here**, same as Session 1. Work this session
+  was limited to code paths I can reason about and cover with the Node unit tests. The visual pass
+  remains the top open item for whoever has a browser.
+- **Reviewed (no change needed):**
+  - `pptx-ordalie.js` vs the installed `pptx-vanilla-viewer@3.43` type defs: confirmed the options we
+    pass (`source`, `editable:false`, `showToolbar:false`, `showThumbnails:false`,
+    `showCompatibilityToasts:false`, `onLoad`/`onError`) and the controller methods we call
+    (`getZoom`/`setZoom`(1=100%)/`zoomToFit`/`destroy`) all exist and match our usage. Fidelity knobs
+    (`maxFitScale`, `fitPadding`, `smartArt3D`, `*Chart3D`) exist but the flat-SVG defaults are the
+    right call for a lean preview; embedded/theme fonts and non-Latin glyphs are handled inside the
+    library (nothing for us to wire). The compare/bake-off `?renderer=` override path in `pptx.js` is
+    intact. **No code change** — the Ordalie path is sound on paper; it still needs the visual pass.
+  - Dispatcher fallback (`pptx.js`) + thresholds: the >25 MB (`PPTX_FAST_FALLBACK_BYTES`) auto-drop to
+    the fast engine, the 40 MB warn / 300 MB hard cap, and the worker/render timeouts are internally
+    consistent. Note for the record: the 30 s `RENDER_HARD_TIMEOUT_MS` only covers the **render** step;
+    the worker parse has its own 120 s budget (`WORKER_PARSE_TIMEOUT_MS`), and it runs *before* the
+    render race — so a legitimately slow large-sheet parse is not killed at 30 s, while a stuck render
+    still is. The 12 s slow-render notice surfaces a Download hatch in the meantime. No stuck-state gap
+    found.
+- **Changed:**
+  - `src/viewer/model/spreadsheet.js` — reworked ExcelJS cell-text extraction into a single recursive
+    `scalarToText(value, numFmt, ssfFormat)`:
+    - **Booleans** now render `TRUE`/`FALSE` (Excel's convention), not JS's `true`/`false`.
+    - **Formula cells** format their cached `result` through the *same* path, so a formula returning a
+      number/date/error now honors the cell's number format (previously the result went through a
+      number-only branch — a formula returning a date showed the raw `Date.toString()`).
+    - Added `isoDateTime()`: a date carrying **no** explicit number format now renders a deterministic
+      UTC `YYYY-MM-DD[ HH:MM:SS]` instead of `toLocaleString()` (which drifted with host
+      locale/timezone — the same cell could read differently on different machines). In practice
+      ExcelJS auto-applies a date format on write, so this only catches computed/unformatted dates.
+  - `test/spreadsheet.test.mjs` — added three round-trip checks (boolean → TRUE/FALSE; formula result
+    honors `#,##0.00`; unformatted date is deterministic). Suite is now **11** spreadsheet checks.
+- **Verified:**
+  - `npm test` → **11 + 3** checks pass. `npm run build` → clean, `dist/` rebuilt. `npm run check` →
+    21 JS + 2 JSON OK.
+  - **NOT run:** the live Chrome end-to-end / visual-fidelity pass (no browser here).
+- **Still open / risks:**
+  - **The visual pass is still owed** — load `dist/` in Chrome and eyeball a real `.pptx` (shapes,
+    SmartArt, WordArt, charts, icons, embedded fonts, non-Latin text), `.xlsx`, `.docx`, `.csv`;
+    confirm the spinner always clears and DevTools Performance shows no repeating layout loop.
+  - **Frozen panes are parsed but not rendered.** `spreadsheet.js` captures `frozen:{rows,cols}` but
+    `grid.js` ignores it — the grid only has sticky column-letter / row-number headers, not sticky
+    *data* panes. This is the biggest remaining Excel fidelity gap; left unimplemented on purpose
+    because getting sticky split panes right in a CSS table needs visual iteration I can't do here.
+  - **Column virtualization / cap:** wide sheets are capped at `MAX_COLS = 1024` and columns past that
+    are silently dropped (only the row count is called out in the large-sheet banner).
+  - Legacy `.xls` (SheetJS path) still has minimal styling — unchanged, as documented.
+  - Real `.docx`/`.pptx` fixtures under `test/fixtures/` still need to be added by hand for a full
+    Chrome pass (only `.csv`/`.xlsx` are generated).
+- **Next session should:** do the browser visual pass above; if the grid needs frozen-pane fidelity,
+  implement sticky split panes in `grid.js` using the already-parsed `frozen` data and verify visually;
+  consider a slide-count-based PPTX fallback (not just file size) if the heavy engine stalls on small-
+  but-slide-heavy decks.
+- **Commit / branch:** **Left uncommitted — per the user, all git (branch/commit/push) is done by the
+  user, not this session.** All Session 2 edits are in the working tree and rebuilt into `dist/`.
