@@ -1,19 +1,42 @@
+/* ---- Design tokens ---- */
 :root {
   --border: #d9dce1;
   --text: #1f2328;
   --muted: #6b7280;
   --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --surface: #ffffff;
+  --btn-hover-bg: #f0f1f3;
+  --success: #047857;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --border: #333740;
+    --text: #e2e5ea;
+    --muted: #8b909a;
+    --accent: #5b8def;
+    --accent-hover: #4a7de8;
+    --surface: #1c1f26;
+    --btn-hover-bg: #282c35;
+    --success: #34d399;
+  }
+}
+
 * { box-sizing: border-box; }
+
 body.popup {
   width: 300px;
   margin: 0;
   padding: 14px 16px;
+  background: var(--surface);
   color: var(--text);
 }
-.popup__title { margin: 0 0 4px; font-size: 16px; }
+
+.popup__title { margin: 0 0 4px; font-size: 16px; font-weight: 700; }
 .popup__status { margin: 0 0 14px; color: var(--muted); font-size: 13px; }
+
 .popup__row {
   display: flex;
   gap: 8px;
@@ -21,8 +44,21 @@ body.popup {
   font-size: 13px;
   margin-bottom: 14px;
   cursor: pointer;
+  color: var(--text);
 }
 .popup__row em { color: var(--muted); font-style: italic; }
+.popup__row--select { justify-content: space-between; align-items: center; }
+.popup__row--select select {
+  font: inherit;
+  font-size: 13px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 2px 4px;
+  max-width: 160px;
+}
+
 .btn {
   font: inherit;
   font-size: 13px;
@@ -30,22 +66,40 @@ body.popup {
   padding: 8px 12px;
   border-radius: 6px;
   border: 1px solid var(--border);
-  background: #fff;
+  background: var(--surface);
+  color: var(--text);
   cursor: pointer;
+  transition: background 0.1s, border-color 0.1s, transform 0.08s;
 }
+.btn:hover { background: var(--btn-hover-bg); }
 .btn--primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-.btn--primary:hover { background: #1d4ed8; }
+.btn--primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
 .btn:active { transform: translateY(1px); }
 .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .btn { transition: none; }
+}
+
+/* Tertiary action — less visual weight than the full-width primary */
+.btn--ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 6px 12px;
+}
+.btn--ghost:hover { background: var(--btn-hover-bg); color: var(--text); border-color: transparent; }
+
 .popup__saved {
   margin: -6px 0 10px;
   min-height: 14px;
-  color: #047857;
+  color: var(--success);
   font-size: 12px;
   font-weight: 600;
   visibility: hidden;
 }
 .popup__saved.is-visible { visibility: visible; }
-.popup__row--select { justify-content: space-between; align-items: center; }
-.popup__row--select select { font: inherit; font-size: 13px; }
-#btn-bakeoff { margin-bottom: 8px; }
+
+#btn-open-viewer { margin-bottom: 6px; }
+#btn-bakeoff { margin-bottom: 2px; }

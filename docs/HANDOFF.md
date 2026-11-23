@@ -169,3 +169,70 @@ then read `.claude/plans/login-spicy-minsky.md` (the master plan), then the file
   but-slide-heavy decks.
 - **Commit / branch:** **Left uncommitted — per the user, all git (branch/commit/push) is done by the
   user, not this session.** All Session 2 edits are in the working tree and rebuilt into `dist/`.
+
+---
+
+### Session 3 — Visual redesign: dark mode, SVG icons, micro-animations, toolbar cleanup
+- **Date:** 2026-11-23
+- **Changed:**
+  - `src/viewer/viewer.css` — full redesign:
+    - Added CSS custom properties for the full palette + new tokens: `--surface-alt`, `--cell-border`,
+      `--overlay-bg`, `--accent-muted-bg/text`, `--accent-hover`, `--btn-hover-bg`, `--banner-*`.
+    - Added `@media (prefers-color-scheme: dark)` block that overrides all tokens (dark palette).
+    - Replaced every hardcoded hex in the file with the matching CSS var — tables, tabs, overlay, badge,
+      banner, bakeoff header, dropzone active state all respect dark mode now.
+    - Micro-animations: `.overlay` and `.panel` fade in (`fade-in` keyframe, 0.18 s); `.btn` has
+      `transition: background/border-color/transform 0.1s/0.08s`; overflow menu slides in
+      (`menu-in` keyframe, 0.12 s); dropzone border/bg transition on drag-over (0.15 s).
+    - `@media (prefers-reduced-motion: reduce)` suppresses all transitions and keyframe animations.
+    - New layout classes: `.btn--icon` (square icon-only), `.btn--icon-label` (icon + text inline),
+      `.icon` (14 × 14 SVG helper), `.dropzone__icon` (56 × 56 hero icon), `.overflow-wrap`,
+      `.overflow-menu` (positioned dropdown with shadow + `menu-in` animation).
+  - `src/viewer/viewer.html` — structural overhaul:
+    - Zoom −/+ buttons now contain inline SVG magnifier icons (search-minus/plus + handle line).
+    - "Open file…" button: folder SVG icon + `btn--icon-label`.
+    - "Download" button: downward-arrow SVG icon + `btn--icon-label`; same icon on the loading-state
+      "Download instead" button and the error-state "Download original" button.
+    - Removed `btn-open-original` from toolbar; wrapped in `#overflow-wrap` / `#overflow-menu`
+      dropdown (three-dot horizontal icon on `#btn-overflow`). Overflow wrap is hidden unless `srcUrl`
+      is set (same visibility rule as before).
+    - Dropzone: added `<svg class="dropzone__icon">` — document-with-folded-corner + embedded
+      drop-arrow circle — above the heading. Heading copy changed from "Drop a document to preview"
+      to "Drop a document here" (shorter, more direct).
+  - `src/viewer/viewer.js` — overflow menu wiring only:
+    - Added `overflowWrap`, `btnOverflow`, `overflowMenu` to the `el` map.
+    - `setActiveFile`: now sets `el.overflowWrap.hidden = !state.srcUrl` (was `btnOpenOriginal.hidden`).
+    - Three new event listeners: `btnOverflow` click (toggle + `aria-expanded`), document click
+      (close on outside click), document keydown (Escape closes + returns focus to `btnOverflow`).
+    - No rendering logic touched.
+  - `src/popup/popup.css` — full redesign:
+    - Added CSS custom properties + `@media (prefers-color-scheme: dark)` for the popup palette.
+    - Fixed hardcoded `background: #fff` on `.btn`; fixed hardcoded `color: #047857` for `.popup__saved`.
+    - Added `.btn--ghost` (tertiary text-link style: transparent bg, muted text, 12 px).
+    - Added `select` dark-mode styling (background + border use CSS vars).
+  - `src/popup/popup.html` — moved "Open viewer" (primary) above the compare button; demoted
+    "Compare PowerPoint quality…" to `btn--ghost` class so the common action is visually obvious.
+- **Verified:**
+  - `npm run build` → clean, `dist/` rebuilt (14 s). `npm test` → 11 + 3 checks pass.
+  - Grepped `dist/` for `prefers-color-scheme` → found in both `viewer.css` and `popup.css`.
+  - Grepped `dist/viewer/viewer.html` and `dist/viewer/viewer.js` for `overflow-wrap`,
+    `btn-overflow`, `overflow-menu` → 3 matches each (HTML structure + JS wiring confirmed in bundle).
+  - Grepped for `dropzone__icon`, `btn--ghost`, `btn--icon-label`, `prefers-reduced-motion` in
+    dist CSS → all present.
+  - **NOT run:** live Chrome dark-mode toggle pass (no browser in this environment). The user should:
+    1. Load/reload `dist/` at chrome://extensions.
+    2. Open the viewer and the popup in both light and dark OS mode.
+    3. Exercise every state: dropzone, loading, each file type (.xlsx/.csv/.docx/.pptx), error,
+       large-file warning, zoom controls. Confirm spinner always clears, no layout loop in DevTools.
+    4. Toggle OS dark mode and confirm viewer + popup follow it immediately.
+- **Still open / risks:**
+  - The live Chrome dark-mode verification is mandatory before shipping (can't be done here).
+  - DOCX pages (`section.docx`) have a hardcoded `box-shadow` with a fixed alpha — looks fine in
+    dark mode but could use a slightly stronger shadow for contrast; not changed to avoid complexity.
+  - Frozen panes (parsed but not rendered in grid.js) remain unimplemented — unchanged from Session 2.
+  - Real `.docx`/`.pptx` test fixtures still need to be added manually under `test/fixtures/`.
+- **Next session should:**
+  - Do the full Chrome visual pass (all file types, dark mode toggle, spinner, no layout loop).
+  - If any dark-mode edge cases surface, patch `viewer.css`/`popup.css` token overrides.
+  - If frozen-pane fidelity is needed, implement sticky split panes in `grid.js` using `frozen` data.
+- **Commit / branch:** Left uncommitted — per the user, all git operations are done by the user.

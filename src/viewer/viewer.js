@@ -15,6 +15,9 @@ const el = {
   typeBadge: $('type-badge'),
   btnOpen: $('btn-open'),
   btnPick: $('btn-pick'),
+  overflowWrap: $('overflow-wrap'),
+  btnOverflow: $('btn-overflow'),
+  overflowMenu: $('overflow-menu'),
   btnOpenOriginal: $('btn-open-original'),
   btnDownload: $('btn-download'),
   zoomControls: $('zoom-controls'),
@@ -211,7 +214,7 @@ function setActiveFile(blob, filename, format) {
   el.typeBadge.textContent = meta ? meta.label : (format || 'file').toUpperCase();
   el.typeBadge.hidden = false;
   el.btnDownload.disabled = !blob;
-  el.btnOpenOriginal.hidden = !state.srcUrl;
+  el.overflowWrap.hidden = !state.srcUrl;
 }
 
 function formatBytes(n) {
@@ -518,6 +521,27 @@ el.btnErrorDownload.addEventListener('click', triggerDownload);
 el.btnLoadingDownload.addEventListener('click', triggerDownload);
 el.btnOpenOriginal.addEventListener('click', () => state.srcUrl && window.open(state.srcUrl, '_blank', 'noopener'));
 el.btnErrorOpen.addEventListener('click', () => state.srcUrl && window.open(state.srcUrl, '_blank', 'noopener'));
+
+// Overflow menu: toggle on button click, close on outside-click or Escape.
+el.btnOverflow.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const opening = el.overflowMenu.hidden;
+  el.overflowMenu.hidden = !opening;
+  el.btnOverflow.setAttribute('aria-expanded', String(opening));
+});
+document.addEventListener('click', () => {
+  if (!el.overflowMenu.hidden) {
+    el.overflowMenu.hidden = true;
+    el.btnOverflow.setAttribute('aria-expanded', 'false');
+  }
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !el.overflowMenu.hidden) {
+    el.overflowMenu.hidden = true;
+    el.btnOverflow.setAttribute('aria-expanded', 'false');
+    el.btnOverflow.focus();
+  }
+});
 
 el.stage.addEventListener('dragover', (e) => {
   e.preventDefault();
